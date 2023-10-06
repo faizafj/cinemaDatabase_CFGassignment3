@@ -2,6 +2,7 @@ DROP DATABASE IF EXISTS Cinema;
 CREATE DATABASE Cinema;
 USE Cinema;
 
+
 -- Movies table
 CREATE TABLE movies (
     movie_id INT AUTO_INCREMENT NOT NULL,
@@ -98,7 +99,6 @@ CREATE TABLE orders (
     order_id INT NOT NULL,
     snack_id INT NOT NULL,
     snack_quantity INT NOT NULL CHECK(snack_quantity > 0),
-    total_price_of_snacks DOUBLE,
     FOREIGN KEY (order_id) REFERENCES orders (order_id),
     FOREIGN KEY (snack_id) REFERENCES snack_details (snack_id)
 );
@@ -137,23 +137,106 @@ UPDATE orders o SET o.total_price = o.total_price_of_tickets + o.total_price_of_
 -- SELECT * FROM orders;
 
 -- Retrieves complete ticket data for the end user 
--- CREATE VIEW all_orders AS 
+CREATE VIEW all_orders AS 
 SELECT CONCAT("Order No: #",o.order_id) AS order_id,  o.time_of_order, 
-date_format(o.date_of_order,'%D %M %Y') AS date_of_order, m.movie_name, sd.snack_name,CONCAT("x",os.snack_quantity) AS snack_quantity,
-t.ticket_type, CONCAT("x",o.ticket_quantity) ticket_quantity, CONCAT("£", o.total_price) AS total_price
+date_format(o.date_of_order,'%D %M %Y') AS date_of_order, m.movie_name,
+sd.snack_name, CONCAT("x",os.snack_quantity) AS snack_quantity,
+t.ticket_type, CONCAT("x",o.ticket_quantity) ticket_quantity, 
+CONCAT("£", o.total_price) AS total_price
 FROM movies m INNER JOIN orders o, order_snacks_details os, snack_details sd, ticket_details t
 WHERE m.movie_id = o.movie_id  AND os.snack_id = sd.snack_id  AND o.ticket_id = t.ticket_id
 AND os.order_id = o.order_id ORDER BY o.date_of_order, o.time_of_order;
 
+SELECT * FROM all_orders;
+
+
+-- View shows 10 of the most recent orders:
+CREATE VIEW latest_orders AS SELECT CONCAT("Order No: #",o.order_id) AS order_id,  o.time_of_order, 
+date_format(o.date_of_order,'%D %M %Y') AS date_of_order, m.movie_name,
+sd.snack_name, CONCAT("x",os.snack_quantity) AS snack_quantity,
+t.ticket_type, CONCAT("x",o.ticket_quantity) ticket_quantity, 
+CONCAT("£", o.total_price) AS total_price
+FROM movies m INNER JOIN orders o, order_snacks_details os, snack_details sd, ticket_details t
+WHERE m.movie_id = o.movie_id  AND os.snack_id = sd.snack_id  AND o.ticket_id = t.ticket_id
+AND os.order_id = o.order_id ORDER BY o.date_of_order, o.time_of_order DESC LIMIT 10;
+
+SELECT * FROM latest_orders;
+
+
 -- Retrieves all popcorn options and checks which is the best selling:
-SELECT s.snack_name, COUNT(o.snack_id) AS times_sold FROM order_snacks_details o INNER JOIN snack_details s WHERE type_of_snack LIKE "popcorn" AND o.snack_id = s.snack_id GROUP BY snack_name;
+SELECT s.snack_name, COUNT(o.snack_id) AS times_sold FROM order_snacks_details o 
+INNER JOIN snack_details s WHERE type_of_snack LIKE "popcorn" AND o.snack_id = s.snack_id GROUP BY snack_name;
 
 -- Retrieves all snack options and checks which is the best selling vs worst selling:
-SELECT s.snack_name, COUNT(o.snack_id) AS times_sold FROM order_snacks_details o INNER JOIN snack_details s WHERE o.snack_id = s.snack_id GROUP BY snack_name ORDER BY times_sold DESC;
-
-
-
+SELECT s.snack_name, COUNT(o.snack_id) AS times_sold FROM order_snacks_details o 
+INNER JOIN snack_details s WHERE o.snack_id = s.snack_id GROUP BY snack_name ORDER BY times_sold DESC;
 
 -- Displays the number of times a standard and premium ticket was purchased in October
 -- CREATE VIEW total_tickets_sold_october AS 
-SELECT t.ticket_type, COUNT(t.ticket_type) AS total_tickets_sold FROM orders o INNER JOIN ticket_details t WHERE o.ticket_id = t.ticket_id AND o.date_of_order LIKE '2023-10%' GROUP BY t.ticket_id;
+SELECT t.ticket_type, COUNT(t.ticket_type) AS total_tickets_sold FROM orders o 
+INNER JOIN ticket_details t WHERE o.ticket_id = t.ticket_id 
+AND o.date_of_order LIKE '2023-10%' GROUP BY t.ticket_id;
+
+DELIMITER //
+CREATE FUNCTION is_correct_ticket(
+    ticket_id INT,
+    isAllowed BOOLEAN
+) 
+RETURNS INT
+DETERMINISTIC
+BEGIN
+    IF ticket_id = 1 THEN
+		 IF isAllowed = TRUE THEN
+			SET ticket_id = 1;
+		ELSEIF isAllowed = FALSE THEN
+			SET ticket_id = 2;
+		END IF;
+    ELSEIF ticket_id = 2 THEN
+		 IF isAllowed = TRUE THEN
+			SET ticket_id = 2;
+		ELSEIF isAllowed = FALSE THEN
+			SET ticket_id = 1;
+		END IF;
+	END IF;
+    RETURN (ticket_id);
+END//
+DELIMITER ; 
+
+-- updates ticket so that users can only purchase tickets with correct ticket type options e.g cannot buy premimum tickets if it's not an option
+UPDATE orders o, ticket_details t, movies m SET o.ticket_id = is_correct_ticket(o.ticket_id, m.premium_tickets) 
+WHERE t.ticket_id = o.ticket_id AND o.movie_id = m.movie_id;
+
+SELECT * FROM all_orders;
+
+ -- Retrieves all snack options and checks which is the best selling vs worst selling:
+SELECT s.snack_name, COUNT(o.snack_id) AS times_sold FROM order_snacks_details o 
+INNER JOIN snack_details s WHERE o.snack_id = s.snack_id GROUP BY snack_name ORDER BY times_sold DESC;
+ 
+
+ALTER table order_snacks_details
+ADD CONSTRAINT order_snacks_foreign_key
+FOREIGN KEY (order_id)
+REFERENCES orders (order_id)
+ON DELETE CASCADE;
+
+ALTER table order_snacks_details
+ADD CONSTRAINT snacks_foreign_key
+FOREIGN KEY (snack_id)
+REFERENCES snack_details (snack_id)
+ON DELETE CASCADE;
+
+
+-- Deletes a specific order using the total price and date of order and ticket quantity
+SELECT * FROM all_orders;
+
+DELETE  o, os FROM orders o INNER JOIN  order_snacks_details os WHERE 
+(SELECT o.date_of_order WHERE o.total_price = 37.50) 
+AND (SELECT o.total_price  WHERE o.date_of_order = "2023-10-03")
+AND (SELECT o.ticket_quantity  WHERE o.ticket_quantity = 5)
+ AND (o.order_id = os.order_id) ;
+SELECT * FROM all_orders;
+
+
+
+DELETE FROM snack_details s
+WHERE (SELECT COUNT(o.snack_id) FROM order_snacks_details o WHERE o.snack_id = s.snack_id)  ORDER BY snack_id DESC;
