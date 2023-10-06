@@ -74,6 +74,10 @@ INSERT INTO snack_details (snack_name, price, type_of_snack) VALUES
 ;
 
 
+
+
+
+
  -- Order table
 CREATE TABLE orders (
     order_id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
@@ -84,7 +88,6 @@ CREATE TABLE orders (
 	ticket_id INT NOT NULL,
     ticket_quantity INT NOT NULL CHECK(ticket_quantity > 0),
     total_price_of_tickets DOUBLE ,
-	total_price_of_snacks DOUBLE,
     FOREIGN KEY (ticket_id)
         REFERENCES ticket_details (ticket_id),
     FOREIGN KEY (movie_id)
@@ -124,36 +127,46 @@ INSERT INTO order_snacks_details (order_id, snack_id, snack_quantity ) VALUES
  (4, 1, 1),
 (5, 11, 1) ;
  
+ 
+-- change date formatting:
 
--- Update the ticket/snacks and total price for each order:
+-- update orders set date_of_order = date_format(date_of_order, '%a-%M-%Y') WHERE orders.order_id; 
+-- SELECT * FROM orders;
+ 
+ 
+-- View all data: 
+SELECT * FROM movies;
+SELECT * FROM ticket_details;
+-- SELECT * FROM snack_details;
+SELECT * FROM orders;
+SELECT * FROM order_snacks_details;
+SELECT * FROM snack_details ORDER BY type_of_snack;
+
+-- Updates the total ticket price for each order:
 UPDATE orders, ticket_details SET orders.total_price_of_tickets 
 = ticket_details.ticket_price * orders.ticket_quantity 
 WHERE orders.ticket_id = ticket_details.ticket_id;
+SELECT * FROM orders;
 
-UPDATE orders o , order_snacks_details os , snack_details s SET o.total_price_of_snacks = s.price * os.snack_quantity 
-WHERE os.order_id = o.order_id;
+-- Updates the total ticket price for each order:
+UPDATE order_snacks_details os , snack_details s SET os.total_price_of_snacks = s.price * os.snack_quantity 
+WHERE os.snack_id = s.snack_id AND order_snacks_details_id ;
+SELECT * FROM os;
 
-UPDATE orders o SET o.total_price = o.total_price_of_tickets + o.total_price_of_snacks;
--- SELECT * FROM orders;
+
 
 -- Retrieves complete ticket data for the end user 
--- CREATE VIEW all_orders AS 
-SELECT CONCAT("Order No: #",o.order_id) AS order_id,  o.time_of_order, 
-date_format(o.date_of_order,'%D %M %Y') AS date_of_order, m.movie_name, sd.snack_name,CONCAT("x",os.snack_quantity) AS snack_quantity,
-t.ticket_type, CONCAT("x",o.ticket_quantity) ticket_quantity, CONCAT("£", o.total_price) AS total_price
+SELECT CONCAT("Order No: #",o.order_id) AS order_id,  o.time_of_order, date_format(o.date_of_order,'%D %M %Y') AS date_of_order, m.movie_name,
+o.total_price, sd.snack_name,CONCAT("x",os.snack_quantity) AS snack_quantity,
+t.ticket_type, CONCAT("x",o.ticket_quantity) ticket_quantity
 FROM movies m INNER JOIN orders o, order_snacks_details os, snack_details sd, ticket_details t
 WHERE m.movie_id = o.movie_id  AND os.snack_id = sd.snack_id  AND o.ticket_id = t.ticket_id
-AND os.order_id = o.order_id ORDER BY o.date_of_order, o.time_of_order;
+AND os.order_id = o.order_id ORDER BY o.date_of_order,  o.time_of_order;
 
--- Retrieves all popcorn options and checks which is the best selling:
-SELECT s.snack_name, COUNT(o.snack_id) AS times_sold FROM order_snacks_details o INNER JOIN snack_details s WHERE type_of_snack LIKE "popcorn" AND o.snack_id = s.snack_id GROUP BY snack_name;
+-- Retrieves all sweet popcorn options which are less than £3.50:
+SELECT snack_name, price FROM snack_details snacks WHERE snack_name LIKE "%sweet" AND price < 3.50;
 
--- Retrieves all snack options and checks which is the best selling vs worst selling:
-SELECT s.snack_name, COUNT(o.snack_id) AS times_sold FROM order_snacks_details o INNER JOIN snack_details s WHERE o.snack_id = s.snack_id GROUP BY snack_name ORDER BY times_sold DESC;
+-- Retrieves all all movies where the tickets are premium only to see which is the best seller:
+SELECT movie_name AS premium_movie_option, movie_description AS premium_movie_description 
+FROM movies WHERE premium_tickets = TRUE AND standard_tickets = FALSE;
 
-
-
-
--- Displays the number of times a standard and premium ticket was purchased in October
--- CREATE VIEW total_tickets_sold_october AS 
-SELECT t.ticket_type, COUNT(t.ticket_type) AS total_tickets_sold FROM orders o INNER JOIN ticket_details t WHERE o.ticket_id = t.ticket_id AND o.date_of_order LIKE '2023-10%' GROUP BY t.ticket_id;
