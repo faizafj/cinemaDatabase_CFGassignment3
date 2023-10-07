@@ -198,8 +198,17 @@ AND os.order_id = o.order_id ORDER BY o.date_of_order, o.time_of_order;
 
 SELECT * FROM all_orders;
 
+-- Displays all movies with standard viewing options.
+CREATE VIEW all_standard_viewing_movies AS SELECT m.movie_name , m.run_time, m.movie_description , m.standard_tickets FROM movies m INNER JOIN ticket_details t WHERE m.standard_tickets = TRUE AND t.ticket_type = "standard ticket";
+SELECT * FROM all_standard_viewing_movies;
+
+-- Displays all movies with premium viewing options.
+CREATE VIEW all_premium_viewing_movies AS SELECT m.movie_name , m.run_time, m.movie_description , m.premium_tickets FROM movies m INNER JOIN ticket_details t WHERE m.premium_tickets = TRUE AND t.ticket_type = "premium ticket";
+SELECT * FROM all_premium_viewing_movies;
+
+
 -- View shows 10 of the most recent orders:
-CREATE VIEW latest_orders AS SELECT CONCAT("Order No: #",o.order_id) AS order_id,  o.time_of_order, 
+CREATE VIEW latest_orders AS SELECT CONCAT("Order No: #",o.order_id) AS order_number,  o.time_of_order, 
 date_format(o.date_of_order,'%D %M %Y') AS date_of_order, m.movie_name,
 sd.snack_name, CONCAT("x",os.snack_quantity) AS snack_quantity,
 t.ticket_type, CONCAT("x",o.ticket_quantity) ticket_quantity, 
@@ -213,7 +222,7 @@ SELECT * FROM latest_orders;
 
 -- Retrieves all popcorn options and checks which is the best selling:
 CREATE VIEW best_selling_popcorn AS SELECT s.snack_name, COUNT(o.snack_id) AS times_sold FROM order_snacks_details o 
-INNER JOIN snack_details s WHERE type_of_snack LIKE "popcorn" AND o.snack_id = s.snack_id GROUP BY snack_name;
+INNER JOIN snack_details s WHERE type_of_snack LIKE "popcorn" AND o.snack_id = s.snack_id GROUP BY snack_name ORDER BY times_sold DESC;
 
 SELECT * FROM best_selling_popcorn;
 
@@ -241,11 +250,23 @@ REFERENCES orders (order_id)
 ON DELETE CASCADE;
 
 
--- Deletes a specific order using the total price and date of order and ticket quantity
+-- Deletes a specific order using the total price and date of order and ticket quantity - allows the user to delete 
+-- orders which they no longer require. (E.g have been refunded / cancelled)
 DELETE  o, os FROM orders o INNER JOIN  order_snacks_details os WHERE 
 (SELECT o.date_of_order WHERE o.total_price = 37.50) 
 AND (SELECT o.total_price  WHERE o.date_of_order = "2023-10-03")
 AND (SELECT o.ticket_quantity  WHERE o.ticket_quantity = 5)
  AND (o.order_id = os.order_id) ;
 -- SELECT * FROM all_orders;
+
+-- All snack orders:
+CREATE VIEW all_snack_orders AS 
+SELECT CONCAT(" #",o.order_id) AS order_number , s.snack_name, os.snack_quantity, o.date_of_order, o.time_of_order, CONCAT(" £",os.snack_quantity * price) AS total_price_for_snacks FROM order_snacks_details os 
+INNER JOIN snack_details s, orders o WHERE s.snack_id = os.snack_id AND os.order_id = o.order_id;
+SELECT * FROM all_snack_orders;
+
+
+SELECT * FROM snack_details;
+
+
 
